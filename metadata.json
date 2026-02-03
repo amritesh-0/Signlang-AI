@@ -1,0 +1,7 @@
+{
+  "name": "SignAI - Sign Language Learning Platform",
+  "description": "A modern, accessible learning platform designed for the hearing and speaking challenged, featuring AI-powered sign language recognition and avatar-led lessons.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
