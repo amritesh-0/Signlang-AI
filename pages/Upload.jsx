@@ -1,13 +1,15 @@
-
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, Clock, AlertCircle, File, Trash2, ArrowRight } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Clock, AlertCircle, File, Trash2, ArrowRight, Loader, Download } from 'lucide-react';
 import Button from '../components/Button';
+import { pipelineService } from '../services/pipelineService';
+import { useNavigate } from 'react-router-dom';
 
 const INITIAL_STEPS = [
     { id: 1, label: 'Reading Document Content', status: 'pending' },
-    { id: 2, label: 'Extracting Key Concepts', status: 'pending' },
-    { id: 3, label: 'Generating Sign Mappings', status: 'pending' },
-    { id: 4, label: 'Rendering AI Avatar Lesson', status: 'pending' },
+    { id: 2, label: 'Simplifying Complexity', status: 'pending' },
+    { id: 3, label: 'Translating to Gloss', status: 'pending' },
+    { id: 4, label: 'Generating Motion Poses', status: 'pending' },
+    { id: 5, label: 'Finalizing Animation', status: 'pending' },
 ];
 
 const UploadPage = () => {
@@ -15,32 +17,67 @@ const UploadPage = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [steps, setSteps] = useState(INITIAL_STEPS);
     const [isComplete, setIsComplete] = useState(false);
+    const [pipelineResult, setPipelineResult] = useState(null);
+    const [error, setError] = useState(null);
+
+    const navigate = useNavigate();
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
+            setError(null);
+            setIsComplete(false);
+            setSteps(INITIAL_STEPS);
         }
     };
 
-    const startProcessing = () => {
+    const startProcessing = async () => {
+        if (!file) return;
+
         setIsUploading(true);
-        let currentStep = 0;
+        setError(null);
+        setSteps(INITIAL_STEPS.map(s => ({ ...s, status: 'pending' })));
 
-        const interval = setInterval(() => {
-            setSteps(prev => prev.map((step, idx) => {
-                if (idx === currentStep) return { ...step, status: 'processing' };
-                if (idx < currentStep) return { ...step, status: 'complete' };
-                return step;
-            }));
+        try {
+            // Simulate incremental progress for visual feedback
+            // In a real app with WebSockets, we'd get real event updates
+            let currentStep = 0;
+            const interval = setInterval(() => {
+                if (currentStep < 4) { // Don't complete step 5 until actual return
+                    setSteps(prev => prev.map((s, idx) =>
+                        idx === currentStep ? { ...s, status: 'processing' } :
+                            idx < currentStep ? { ...s, status: 'complete' } : s
+                    ));
+                    currentStep++;
+                }
+            }, 3000); // 3 seconds per simulated step
 
-            if (currentStep >= steps.length) {
-                clearInterval(interval);
-                setSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
-                setIsComplete(true);
-                setIsUploading(false);
-            }
-            currentStep++;
-        }, 2000);
+            const result = await pipelineService.processFullPipeline(file, (percent) => {
+                console.log(`Upload Progress: ${percent}%`);
+            });
+
+            clearInterval(interval);
+
+            // Mark all as complete on success
+            setPipelineResult(result);
+            setSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
+            setIsComplete(true);
+
+        } catch (err) {
+            console.error(err);
+            setError("Failed to process document. Please ensure the backend is running.");
+            setSteps(prev => prev.map(s => ({ ...s, status: 'error' })));
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const getChapters = () => {
+        return pipelineResult?.pipeline_summary?.final_output?.video_chapters || [];
+    };
+
+    const handleOpenLesson = () => {
+        navigate('/lesson', { state: { pipelineResult } });
     };
 
     return (
@@ -52,7 +89,7 @@ const UploadPage = () => {
                 </p>
             </div>
 
-            {!isUploading && !isComplete ? (
+            {!isUploading && !isComplete && !error ? (
                 <div className="space-y-8">
                     {/* Upload Card */}
                     <div
@@ -120,47 +157,86 @@ const UploadPage = () => {
                                 <div>
                                     <h3 className="font-bold text-slate-900">{file?.name || "Processing Content"}</h3>
                                     <p className="text-sm text-slate-500">
-                                        {isComplete ? "Processing Complete" : "AI is converting your material..."}
+                                        {error ? "Processing Failed" : isComplete ? "Processing Complete" : "AI is converting your material..."}
                                     </p>
                                 </div>
                             </div>
                             {isComplete && <CheckCircle size={24} className="text-teal-500" fill="currentColor" />}
+                            {error && <AlertCircle size={24} className="text-red-500" />}
                         </div>
 
-                        <div className="space-y-6">
-                            {steps.map((step) => (
-                                <div key={step.id} className="flex items-center gap-4">
-                                    <div className={`
-                    w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500
-                    ${step.status === 'complete' ? 'bg-teal-500 border-teal-500 text-white' :
-                                            step.status === 'processing' ? 'border-indigo-600 text-indigo-600 animate-pulse' :
-                                                'border-slate-100 text-slate-200'}
-                  `}>
-                                        {step.status === 'complete' ? <CheckCircle size={14} fill="currentColor" /> :
-                                            step.status === 'processing' ? <Clock size={14} className="animate-spin" /> :
-                                                <span className="text-xs font-bold">{step.id}</span>}
+                        {error ? (
+                            <div className="p-4 bg-red-50 text-red-700 rounded-xl border border-red-100">
+                                {error}
+                                <button
+                                    onClick={() => { setError(null); setIsUploading(false); setIsComplete(false); }}
+                                    className="block mt-2 font-bold underline"
+                                >
+                                    Try Again
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {steps.map((step) => (
+                                    <div key={step.id} className="flex items-center gap-4">
+                                        <div className={`
+                        w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500
+                        ${step.status === 'complete' ? 'bg-teal-500 border-teal-500 text-white' :
+                                                step.status === 'processing' ? 'border-indigo-600 text-indigo-600 animate-pulse' :
+                                                    'border-slate-100 text-slate-200'}
+                      `}>
+                                            {step.status === 'complete' ? <CheckCircle size={14} fill="currentColor" /> :
+                                                step.status === 'processing' ? <Loader size={14} className="animate-spin" /> :
+                                                    <span className="text-xs font-bold">{step.id}</span>}
+                                        </div>
+                                        <span className={`
+                        font-semibold text-lg transition-colors duration-500
+                        ${step.status === 'complete' ? 'text-slate-900' :
+                                                step.status === 'processing' ? 'text-indigo-600' : 'text-slate-300'}
+                      `}>
+                                            {step.label}
+                                        </span>
                                     </div>
-                                    <span className={`
-                    font-semibold text-lg transition-colors duration-500
-                    ${step.status === 'complete' ? 'text-slate-900' :
-                                            step.status === 'processing' ? 'text-indigo-600' : 'text-slate-300'}
-                  `}>
-                                        {step.label}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
 
                         {isComplete && (
-                            <div className="pt-8 border-t border-slate-100">
-                                <Button size="xl" className="w-full flex items-center justify-center gap-3">
+                            <div className="pt-8 border-t border-slate-100 space-y-4">
+                                <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 text-teal-800">
+                                    <h4 className="font-bold mb-3">Generated Animations</h4>
+
+                                    <div className="space-y-2">
+                                        {getChapters().map((chapter, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-lg border border-teal-100">
+                                                <div>
+                                                    <p className="font-semibold text-sm">{chapter.chapter_title}</p>
+                                                    <p className="text-xs text-slate-400">
+                                                        Duration: {chapter.duration_seconds?.toFixed(1) || "?"}s
+                                                    </p>
+                                                </div>
+                                                <a
+                                                    href={`http://127.0.0.1:8000${chapter.video_url}`}
+                                                    download
+                                                    className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                                >
+                                                    <Download size={16} /> JSON
+                                                </a>
+                                            </div>
+                                        ))}
+                                        {getChapters().length === 0 && (
+                                            <p className="text-sm text-slate-400 italic">No output generated.</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button size="xl" className="w-full flex items-center justify-center gap-3" onClick={handleOpenLesson}>
                                     Open AI Lesson <ArrowRight size={20} />
                                 </Button>
                             </div>
                         )}
                     </div>
 
-                    {!isComplete && (
+                    {!isComplete && !error && (
                         <div className="p-6 bg-indigo-50/50 rounded-3xl flex items-start gap-4 border border-indigo-100">
                             <AlertCircle className="text-indigo-600 flex-shrink-0" size={24} />
                             <p className="text-sm text-indigo-800 leading-relaxed">

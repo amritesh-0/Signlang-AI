@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import Dashboard from './pages/Dashboard';
 import LessonViewer from './pages/LessonViewer';
@@ -7,46 +8,37 @@ import QueryInterface from './pages/QueryInterface';
 import UploadPage from './pages/Upload';
 
 const App = () => {
-    const [currentView, setCurrentView] = useState('dashboard');
-
-    const renderView = () => {
-        switch (currentView) {
-            case 'dashboard':
-                return <Dashboard setView={setCurrentView} />;
-            case 'learn':
-                return <LessonViewer />;
-            case 'query':
-                return <QueryInterface />;
-            case 'upload':
-                return <UploadPage />;
-            case 'content':
-                return (
-                    <div className="max-w-7xl mx-auto px-6 py-12 text-center space-y-8">
-                        <h1 className="text-3xl font-bold">My Archive</h1>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm text-left">
-                                    <div className="aspect-video bg-slate-100 rounded-2xl mb-4 overflow-hidden">
-                                        <img src={`https://picsum.photos/seed/${i}/400/225`} className="w-full h-full object-cover" alt="Saved material" />
-                                    </div>
-                                    <h3 className="font-bold text-lg">Biology Chapter {i}</h3>
-                                    <p className="text-slate-500 text-sm mb-4">Converted 2 days ago • 12:00 duration</p>
-                                    <button className="text-indigo-600 font-semibold text-sm hover:underline">Watch Lesson</button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            default:
-                return <Dashboard setView={setCurrentView} />;
-        }
-    };
+    // We can use location to pass to Navigation if it needs to know current tab
+    const location = useLocation();
 
     return (
         <div className="min-h-screen bg-[#F9FAFB] text-[#111827]">
-            <Navigation currentView={currentView} setView={setCurrentView} />
+            <Navigation />
             <main className="transition-all duration-300">
-                {renderView()}
+                <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/lesson" element={<LessonViewer />} />
+                    <Route path="/learn" element={<LessonViewer />} /> {/* Alias */}
+                    <Route path="/query" element={<QueryInterface />} />
+                    <Route path="/upload" element={<UploadPage />} />
+                    <Route path="/content" element={
+                        <div className="max-w-7xl mx-auto px-6 py-12 text-center space-y-8">
+                            <h1 className="text-3xl font-bold">My Archive</h1>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm text-left">
+                                        <div className="aspect-video bg-slate-100 rounded-2xl mb-4 overflow-hidden">
+                                            <img src={`https://picsum.photos/seed/${i}/400/225`} className="w-full h-full object-cover" alt="Saved material" />
+                                        </div>
+                                        <h3 className="font-bold text-lg">Biology Chapter {i}</h3>
+                                        <p className="text-slate-500 text-sm mb-4">Converted 2 days ago • 12:00 duration</p>
+                                        <button className="text-indigo-600 font-semibold text-sm hover:underline">Watch Lesson</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    } />
+                </Routes>
             </main>
 
             {/* Footer (Simplified & Accessible) */}
