@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import random
 import numpy as np
 from typing import List, Dict, Any, Optional
@@ -24,14 +26,24 @@ class SkeletalPoseGenerator:
             "l_forearm": "mixamorigLeftForeArm",
             "l_hand": "mixamorigLeftHand"
         }
-        self.pose_dictionary = self._load_mock_dictionary()
-        
-    def _load_mock_dictionary(self) -> Dict[str, List[Dict[str, Any]]]:
+        self.pose_dictionary = self._load_pose_dictionary()
+
+    def _load_pose_dictionary(self) -> Dict[str, List[Dict[str, Any]]]:
+        cache_path = os.path.join(os.path.dirname(__file__), "..", "dataset", "pose_cache.json")
+        cache_path = os.path.abspath(cache_path)
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r") as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and data:
+                    return {k.upper(): v for k, v in data.items() if isinstance(v, list)}
+            except Exception as exc:
+                logger.warning("Failed to load pose cache: %s", exc)
         return {
             "HELLO": self._generate_wave_sequence(),
             "WORLD": self._generate_circle_sequence(),
-            "NAME": self._generate_neutral_sequence(15), # Placeholder
-            "IS": self._generate_neutral_sequence(10)
+            "NAME": self._generate_neutral_sequence(15),
+            "IS": self._generate_neutral_sequence(10),
         }
 
     def _get_base_pose(self) -> Dict[str, List[float]]:
@@ -100,8 +112,8 @@ class SkeletalPoseGenerator:
         gloss = gloss.upper().strip()
         if gloss in self.pose_dictionary:
             return self.pose_dictionary[gloss]
-        
-        return self._generate_random_rotations(gloss)
+
+        return self._finger_spell_sequence(gloss)
 
     def _generate_random_rotations(self, text: str) -> List[Dict[str, Any]]:
         frames = []
@@ -113,6 +125,19 @@ class SkeletalPoseGenerator:
                 current_bones = base.copy()
                 current_bones[self.bone_names["r_hand"]] = target_rot
                 current_bones[self.bone_names["l_hand"]] = [-r for r in target_rot]
+                frames.append({"bones": current_bones})
+        return frames
+
+    def _finger_spell_sequence(self, text: str) -> List[Dict[str, Any]]:
+        frames = []
+        base = self._get_base_pose()
+        for char in text:
+            code = ord(char)
+            angle = ((code % 20) - 10) / 80.0
+            for _ in range(8):
+                current_bones = base.copy()
+                current_bones[self.bone_names["r_hand"]] = [0.0, angle, -angle]
+                current_bones[self.bone_names["l_hand"]] = [0.0, -angle * 0.6, angle * 0.3]
                 frames.append({"bones": current_bones})
         return frames
 
@@ -176,4 +201,3 @@ def process_stage4(gloss_data: Dict[str, Any]) -> Dict[str, Any]:
         })
         
     return {"pose_chapters": pose_chapters}
-
