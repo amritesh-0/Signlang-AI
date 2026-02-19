@@ -8,3 +8,6 @@ python-pptx
 transformers
 torch
 sentencepiece
+mediapipe==0.10.5
+opencv-python
+numpy
